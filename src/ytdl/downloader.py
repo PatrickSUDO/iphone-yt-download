@@ -45,21 +45,24 @@ def check_aria2c_available() -> bool:
 
 def get_cookies_file() -> Path | None:
     """Get cookies file path, creating from base64 env var if needed."""
-    if not settings.youtube_cookies_base64:
-        logger.info("No YouTube cookies configured")
-        return None
+    # Temporarily disabled for debugging
+    logger.info("Cookies temporarily disabled for testing")
+    return None
 
-    try:
-        cookies_content = base64.b64decode(settings.youtube_cookies_base64).decode("utf-8")
-        cookies_path = Path(tempfile.gettempdir()) / "youtube_cookies.txt"
-        cookies_path.write_text(cookies_content)
-        # Log first few lines to verify format (without sensitive data)
-        lines = cookies_content.strip().split('\n')
-        logger.info(f"Loaded YouTube cookies: {len(lines)} lines, starts with: {lines[0][:50] if lines else 'empty'}...")
-        return cookies_path
-    except Exception as e:
-        logger.warning(f"Failed to decode cookies: {e}")
-        return None
+    # if not settings.youtube_cookies_base64:
+    #     logger.info("No YouTube cookies configured")
+    #     return None
+    #
+    # try:
+    #     cookies_content = base64.b64decode(settings.youtube_cookies_base64).decode("utf-8")
+    #     cookies_path = Path(tempfile.gettempdir()) / "youtube_cookies.txt"
+    #     cookies_path.write_text(cookies_content)
+    #     lines = cookies_content.strip().split('\n')
+    #     logger.info(f"Loaded YouTube cookies: {len(lines)} lines, starts with: {lines[0][:50] if lines else 'empty'}...")
+    #     return cookies_path
+    # except Exception as e:
+    #     logger.warning(f"Failed to decode cookies: {e}")
+    #     return None
 
 
 def download_video(
