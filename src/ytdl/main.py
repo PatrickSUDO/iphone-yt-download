@@ -1,10 +1,14 @@
 """FastAPI application entry point."""
 
+from pathlib import Path
+
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from ytdl.api import router
+from ytdl.config import StorageMode, settings
 from ytdl.errors import ERROR_MESSAGES, ErrorCode
 from ytdl.models import ErrorResponse
 
@@ -44,7 +48,16 @@ async def validation_exception_handler(
 @app.get("/health")
 async def health_check() -> dict:
     """Health check endpoint."""
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "storage_mode": settings.storage_mode.value,
+    }
 
 
 app.include_router(router)
+
+# Mount static files for local storage mode
+if settings.storage_mode == StorageMode.LOCAL:
+    downloads_dir = Path(settings.local_storage_dir)
+    downloads_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/downloads", StaticFiles(directory=str(downloads_dir)), name="downloads")
