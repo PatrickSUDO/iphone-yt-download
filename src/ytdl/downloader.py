@@ -33,16 +33,13 @@ def get_format_selector(quality: str) -> str:
     """
     Get yt-dlp format selector string for requested quality.
 
-    Priority: requested quality -> any available -> best
-    More flexible fallback chain to handle videos with limited formats.
+    Uses simple fallback: try quality limit, otherwise get best available.
     """
-    quality_map = {
-        "480": "bestvideo[height<=480]+bestaudio/bestvideo[height<=480]/best[height<=480]/bestvideo+bestaudio/best",
-        "720": "bestvideo[height<=720]+bestaudio/bestvideo[height<=720]/best[height<=720]/bestvideo+bestaudio/best",
-        "1080": "bestvideo[height<=1080]+bestaudio/bestvideo[height<=1080]/best[height<=1080]/bestvideo+bestaudio/best",
-        "best": "bestvideo+bestaudio/best",
-    }
-    return quality_map.get(quality, quality_map["720"])
+    if quality == "best":
+        return "bv*+ba/b"  # best video + best audio, or best combined
+
+    # For specific quality, try with limit then fall back to best
+    return f"bv*[height<={quality}]+ba/b[height<={quality}]/bv*+ba/b"
 
 
 def check_aria2c_available() -> bool:
