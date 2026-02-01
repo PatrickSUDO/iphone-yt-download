@@ -7,50 +7,35 @@
 ## 架構
 
 ```
-iPhone 捷徑 → Caddy (TLS) → FastAPI → Redis 佇列 → Worker → Cloudflare R2
-                                                                  ↓
-                                                          Signed URL → iPhone
+iPhone 捷徑 → Railway/VPS → Redis → Worker → Cloudflare R2
+                                                   ↓
+                                           Signed URL → iPhone
 ```
 
-## 快速開始
+## 部署方式
 
-### 前置需求
+| 方式 | 難度 | 費用 | 適合 |
+|------|------|------|------|
+| [Railway](docs/deployment-railway.md) | ⭐ 簡單 | ~$5/月 | 快速上線、輕度使用 |
+| [Hetzner VPS](docs/deployment.md) | 中等 | ~$5/月 | 大量使用、固定費用 |
 
-- Docker & Docker Compose
-- Cloudflare R2 儲存桶與 API 憑證
-- 網域名稱（用於 HTTPS）
+## 快速開始（Railway）
 
-### 1. 複製並設定
+1. Fork 這個專案到你的 GitHub
+2. 前往 [railway.app](https://railway.app) 從 GitHub 建立新專案
+3. 新增 Redis 服務
+4. 設定環境變數（參考 [Railway 教學](docs/deployment-railway.md)）
+5. 部署完成！
+
+## 本地測試
 
 ```bash
-git clone <repo-url>
-cd iphone-yt-download
+# 安裝依賴
+uv sync
 
-# 複製並編輯環境變數
-cp .env.example .env
+# 執行測試
+make test
 ```
-
-編輯 `.env` 設定：
-
-```env
-# 必填
-API_TOKEN=你的安全隨機token
-R2_ACCOUNT_ID=你的cloudflare帳號id
-R2_ACCESS_KEY_ID=你的r2存取金鑰
-R2_SECRET_ACCESS_KEY=你的r2密鑰
-R2_BUCKET_NAME=ytdl-videos
-DOMAIN=your-domain.com
-```
-
-### 2. 部署
-
-```bash
-docker compose up -d
-```
-
-### 3. 設定 iPhone 捷徑
-
-參考 [iPhone 捷徑設置教學](docs/iphone-shortcut.md)
 
 ## API 說明
 
@@ -64,7 +49,7 @@ X-API-Token: your-api-token
 
 ### POST /jobs
 
-建立新的下載任務。
+建立下載任務。
 
 **請求：**
 
@@ -78,7 +63,7 @@ X-API-Token: your-api-token
 | 欄位 | 類型 | 必填 | 說明 |
 |------|------|------|------|
 | url | string | 是 | YouTube 影片網址 |
-| quality | string | 否 | 影片品質：`480`、`720`、`1080` 或 `best`（預設：`720`） |
+| quality | string | 否 | `480`、`720`、`1080` 或 `best`（預設：`720`） |
 
 **回應 (200)：**
 
@@ -93,19 +78,6 @@ X-API-Token: your-api-token
 
 查詢任務狀態。
 
-**回應（處理中）：**
-
-```json
-{
-  "job_id": "uuid",
-  "status": "running",
-  "progress": {
-    "stage": "downloading",
-    "pct": 42
-  }
-}
-```
-
 **回應（完成）：**
 
 ```json
@@ -115,17 +87,6 @@ X-API-Token: your-api-token
   "download_url": "https://...",
   "expires_at": "2026-02-01T12:34:56Z",
   "filename": "video.mp4"
-}
-```
-
-**回應（錯誤）：**
-
-```json
-{
-  "job_id": "uuid",
-  "status": "error",
-  "error_code": "DOWNLOAD_FAILED",
-  "message": "錯誤描述"
 }
 ```
 
@@ -140,7 +101,6 @@ X-API-Token: your-api-token
 | UPLOAD_FAILED | 上傳至 R2 失敗 |
 | UNAUTHORIZED | API Token 無效 |
 | RATE_LIMITED | 請求過於頻繁 |
-| JOB_NOT_FOUND | 找不到任務 |
 
 ## 本地開發
 
@@ -148,49 +108,25 @@ X-API-Token: your-api-token
 
 - Python 3.12+
 - [uv](https://github.com/astral-sh/uv)
-- Redis
+- Docker（用於 Redis）
 - ffmpeg
-- aria2（選用，可加速下載）
 
-### 設定
-
-```bash
-# 安裝依賴
-uv sync
-
-# 啟動 Redis
-docker run -d -p 6379:6379 redis:alpine
-
-# 複製並編輯 .env
-cp .env.example .env
-
-# 啟動 API 伺服器
-uv run uvicorn ytdl.main:app --reload
-
-# 在另一個終端機啟動 worker
-uv run rq worker --url redis://localhost:6379/0
-```
-
-### 測試
+### 指令
 
 ```bash
-# 建立任務
-curl -X POST http://localhost:8000/jobs \
-  -H "X-API-Token: your-token" \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://youtube.com/watch?v=dQw4w9WgXcQ", "quality": "720"}'
-
-# 查詢狀態
-curl http://localhost:8000/jobs/{job_id} \
-  -H "X-API-Token: your-token"
+make install     # 安裝依賴
+make test        # 完整測試
+make test-quick  # 快速測試（不下載）
+make dev         # 啟動開發伺服器
+make clean       # 停止服務並清理
 ```
 
-## R2 儲存桶設定
+## 文件
 
-1. 在 Cloudflare R2 建立儲存桶
-2. 建立具有讀寫權限的 API Token
-3. （建議）設定生命週期規則，自動刪除 3-7 天前的檔案
+- [Railway 部署教學](docs/deployment-railway.md) - 推薦
+- [Hetzner VPS 部署教學](docs/deployment.md)
+- [iPhone 捷徑設置](docs/iphone-shortcut.md)
 
-## 授權條款
+## 授權
 
 MIT
