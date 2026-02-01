@@ -100,7 +100,7 @@ def _generate_r2_url(object_key: str, expiry_minutes: int) -> tuple[str, datetim
 
     try:
         if settings.r2_public_url:
-            url = f"{settings.r2_public_url.rstrip('/')}/{object_key}"
+            url = f"{settings.r2_public_url.strip().rstrip('/')}/{object_key}"
             return url, expires_at
 
         url = client.generate_presigned_url(
