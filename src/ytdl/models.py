@@ -43,6 +43,8 @@ class CreateJobRequest(BaseModel):
 
     url: str = Field(..., description="YouTube video URL")
     quality: Quality = Field(default=Quality.Q720, description="Video quality")
+    wait: bool = Field(default=False, description="Wait for job completion")
+    timeout: int = Field(default=300, ge=1, le=600, description="Max wait time in seconds")
 
     @field_validator("url")
     @classmethod

@@ -69,16 +69,11 @@ def set_job_data(redis: Redis, job_id: str, data: dict) -> None:
 async def create_job(
     request: CreateJobRequest,
     _token: Annotated[str, Depends(verify_token)],
-    wait: bool = False,
-    timeout: int = 300,
 ) -> CreateJobResponse | JobStatusResponse:
     """
     Create a new video download job.
 
-    Args:
-        request: Job creation request with URL and quality
-        wait: If True, wait until job completes and return full status with download_url
-        timeout: Max seconds to wait (default 300 = 5 minutes, max 600)
+    Pass wait=true in JSON body to wait for completion and get download_url directly.
     """
     redis = get_redis()
 
@@ -120,11 +115,11 @@ async def create_job(
     )
 
     # If not waiting, return immediately
-    if not wait:
+    if not request.wait:
         return CreateJobResponse(job_id=job_id)
 
     # Long-polling: wait until job is done/error or timeout
-    timeout = min(timeout, 600)
+    timeout = min(request.timeout, 600)
     elapsed = 0
     poll_interval = 2
 
