@@ -59,7 +59,7 @@ def set_job_data(redis: Redis, job_id: str, data: dict) -> None:
 
 @router.post(
     "/jobs",
-    response_model=CreateJobResponse,
+    response_model=None,  # Dynamic response based on wait parameter
     responses={
         400: {"model": ErrorResponse},
         401: {"model": ErrorResponse},
