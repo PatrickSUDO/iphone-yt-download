@@ -12,12 +12,9 @@ iPhone Shortcut → Railway/VPS → Redis → Worker → Cloudflare R2
                                                Signed URL → iPhone
 ```
 
-## Deployment Options
+## Deployment
 
-| Method | Difficulty | Cost | Best For |
-|--------|------------|------|----------|
-| [Railway](docs/deployment-railway.md) | ⭐ Easy | ~$5/mo | Quick setup, light usage |
-| [Hetzner VPS](docs/deployment.md) | Medium | ~$5/mo | Heavy usage, predictable cost |
+See [Railway Deployment Guide](docs/deployment-railway.md)
 
 ## Quick Start (Railway)
 
@@ -123,8 +120,7 @@ make clean       # Stop services and cleanup
 
 ## Documentation
 
-- [Railway Deployment](docs/deployment-railway.md) - Recommended
-- [Hetzner VPS Deployment](docs/deployment.md)
+- [Railway Deployment](docs/deployment-railway.md)
 - [iPhone Shortcut Setup](docs/iphone-shortcut.md)
 
 ## License

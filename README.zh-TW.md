@@ -14,10 +14,7 @@ iPhone 捷徑 → Railway/VPS → Redis → Worker → Cloudflare R2
 
 ## 部署方式
 
-| 方式 | 難度 | 費用 | 適合 |
-|------|------|------|------|
-| [Railway](docs/deployment-railway.md) | ⭐ 簡單 | ~$5/月 | 快速上線、輕度使用 |
-| [Hetzner VPS](docs/deployment.md) | 中等 | ~$5/月 | 大量使用、固定費用 |
+參考 [Railway 部署教學](docs/deployment-railway.md)
 
 ## 快速開始（Railway）
 
@@ -123,8 +120,7 @@ make clean       # 停止服務並清理
 
 ## 文件
 
-- [Railway 部署教學](docs/deployment-railway.md) - 推薦
-- [Hetzner VPS 部署教學](docs/deployment.md)
+- [Railway 部署教學](docs/deployment-railway.md)
 - [iPhone 捷徑設置](docs/iphone-shortcut.md)
 
 ## 授權
