@@ -69,8 +69,17 @@ def set_job_data(redis: Redis, job_id: str, data: dict) -> None:
 async def create_job(
     request: CreateJobRequest,
     _token: Annotated[str, Depends(verify_token)],
-) -> CreateJobResponse:
-    """Create a new video download job."""
+    wait: bool = False,
+    timeout: int = 300,
+) -> CreateJobResponse | JobStatusResponse:
+    """
+    Create a new video download job.
+
+    Args:
+        request: Job creation request with URL and quality
+        wait: If True, wait until job completes and return full status with download_url
+        timeout: Max seconds to wait (default 300 = 5 minutes, max 600)
+    """
     redis = get_redis()
 
     # Rate limiting check
@@ -110,7 +119,41 @@ async def create_job(
         job_timeout=600,  # 10 minutes timeout
     )
 
-    return CreateJobResponse(job_id=job_id)
+    # If not waiting, return immediately
+    if not wait:
+        return CreateJobResponse(job_id=job_id)
+
+    # Long-polling: wait until job is done/error or timeout
+    timeout = min(timeout, 600)
+    elapsed = 0
+    poll_interval = 2
+
+    while elapsed < timeout:
+        await asyncio.sleep(poll_interval)
+        elapsed += poll_interval
+
+        job_data = get_job_data(redis, job_id)
+        if job_data and job_data["status"] in [JobStatus.DONE.value, JobStatus.ERROR.value]:
+            break
+
+    # Get final job data and return full status
+    job_data = get_job_data(redis, job_id)
+    response = JobStatusResponse(
+        job_id=job_data["job_id"],
+        status=JobStatus(job_data["status"]),
+    )
+
+    if job_data["status"] == JobStatus.DONE.value:
+        response.download_url = job_data.get("download_url")
+        if "expires_at" in job_data:
+            response.expires_at = datetime.fromisoformat(job_data["expires_at"])
+        response.filename = job_data.get("filename")
+
+    if job_data["status"] == JobStatus.ERROR.value:
+        response.error_code = ErrorCode(job_data.get("error_code", ErrorCode.INTERNAL_ERROR))
+        response.message = job_data.get("message", ERROR_MESSAGES[response.error_code])
+
+    return response
 
 
 @router.get(
