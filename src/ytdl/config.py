@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     # Rate limiting
     rate_limit_per_minute: int = 10
 
+    # YouTube cookies (base64 encoded cookies.txt content)
+    youtube_cookies_base64: str = ""
+
     @property
     def r2_endpoint_url(self) -> str:
         """Get R2 S3-compatible endpoint URL."""

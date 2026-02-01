@@ -1,9 +1,11 @@
 """YouTube video downloader using yt-dlp."""
 
+import base64
 import logging
 import re
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Callable
 
@@ -45,6 +47,22 @@ def get_format_selector(quality: str) -> str:
 def check_aria2c_available() -> bool:
     """Check if aria2c is available."""
     return shutil.which("aria2c") is not None
+
+
+def get_cookies_file() -> Path | None:
+    """Get cookies file path, creating from base64 env var if needed."""
+    if not settings.youtube_cookies_base64:
+        return None
+
+    try:
+        cookies_content = base64.b64decode(settings.youtube_cookies_base64).decode("utf-8")
+        cookies_path = Path(tempfile.gettempdir()) / "youtube_cookies.txt"
+        cookies_path.write_text(cookies_content)
+        logger.info("Using YouTube cookies from environment")
+        return cookies_path
+    except Exception as e:
+        logger.warning(f"Failed to decode cookies: {e}")
+        return None
 
 
 def download_video(
@@ -94,6 +112,11 @@ def download_video(
             "ffmpeg": ["-c", "copy"],
         },
     }
+
+    # Add cookies if available
+    cookies_file = get_cookies_file()
+    if cookies_file:
+        ydl_opts["cookiefile"] = str(cookies_file)
 
     # Use aria2c if available for faster downloads
     if check_aria2c_available():
