@@ -1,5 +1,6 @@
 """API routes for the YouTube downloader."""
 
+import asyncio
 import json
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -123,9 +124,47 @@ async def create_job(
 async def get_job_status(
     job_id: str,
     _token: Annotated[str, Depends(verify_token)],
+    wait: bool = False,
+    timeout: int = 300,
 ) -> JobStatusResponse:
-    """Get the status of a download job."""
+    """
+    Get the status of a download job.
+
+    Args:
+        job_id: The job ID to check
+        wait: If True, wait until job is done or error (long-polling)
+        timeout: Max seconds to wait (default 300 = 5 minutes, max 600)
+    """
     redis = get_redis()
+
+    # Cap timeout at 10 minutes
+    timeout = min(timeout, 600)
+
+    # Long-polling: wait until job is done/error or timeout
+    if wait:
+        elapsed = 0
+        poll_interval = 2  # Check every 2 seconds
+
+        while elapsed < timeout:
+            job_data = get_job_data(redis, job_id)
+
+            if not job_data:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=ErrorResponse(
+                        error_code=ErrorCode.JOB_NOT_FOUND,
+                        message=ERROR_MESSAGES[ErrorCode.JOB_NOT_FOUND],
+                    ).model_dump(),
+                )
+
+            # If job is done or error, return immediately
+            if job_data["status"] in [JobStatus.DONE.value, JobStatus.ERROR.value]:
+                break
+
+            # Wait and try again
+            await asyncio.sleep(poll_interval)
+            elapsed += poll_interval
+
     job_data = get_job_data(redis, job_id)
 
     if not job_data:
