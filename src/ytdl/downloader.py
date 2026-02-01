@@ -33,12 +33,13 @@ def get_format_selector(quality: str) -> str:
     """
     Get yt-dlp format selector string for requested quality.
 
-    Priority: requested quality -> lower quality -> best available
+    Priority: requested quality -> any available -> best
+    More flexible fallback chain to handle videos with limited formats.
     """
     quality_map = {
-        "480": "bestvideo[height<=480]+bestaudio/best[height<=480]/best",
-        "720": "bestvideo[height<=720]+bestaudio/best[height<=720]/best",
-        "1080": "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
+        "480": "bestvideo[height<=480]+bestaudio/bestvideo[height<=480]/best[height<=480]/bestvideo+bestaudio/best",
+        "720": "bestvideo[height<=720]+bestaudio/bestvideo[height<=720]/best[height<=720]/bestvideo+bestaudio/best",
+        "1080": "bestvideo[height<=1080]+bestaudio/bestvideo[height<=1080]/best[height<=1080]/bestvideo+bestaudio/best",
         "best": "bestvideo+bestaudio/best",
     }
     return quality_map.get(quality, quality_map["720"])
