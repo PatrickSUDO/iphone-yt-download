@@ -1,0 +1,17 @@
+{$DOMAIN:localhost} {
+    # Reverse proxy to API
+    reverse_proxy api:8000
+
+    # Security headers
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+    }
+
+    # Logging
+    log {
+        output stdout
+        format json
+    }
+}
