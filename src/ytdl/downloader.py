@@ -32,14 +32,10 @@ def sanitize_filename(title: str) -> str:
 def get_format_selector(quality: str) -> str:
     """
     Get yt-dlp format selector string for requested quality.
-
-    Uses simple fallback: try quality limit, otherwise get best available.
     """
-    if quality == "best":
-        return "bv*+ba/b"  # best video + best audio, or best combined
-
-    # For specific quality, try with limit then fall back to best
-    return f"bv*[height<={quality}]+ba/b[height<={quality}]/bv*+ba/b"
+    # Use simple 'best' for maximum compatibility
+    # yt-dlp will automatically select the best available format
+    return "best"
 
 
 def check_aria2c_available() -> bool:
