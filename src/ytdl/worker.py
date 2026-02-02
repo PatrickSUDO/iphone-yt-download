@@ -9,9 +9,10 @@ from pathlib import Path
 
 from redis import Redis
 
+from ytdl.cobalt import download_with_cobalt, should_fallback_to_cobalt
 from ytdl.config import settings
 from ytdl.downloader import download_video
-from ytdl.errors import ErrorCode, YTDLError
+from ytdl.errors import DownloadError, ErrorCode, YTDLError
 from ytdl.models import JobStatus, ProgressStage
 from ytdl.storage import generate_presigned_url, upload_file
 
@@ -82,9 +83,26 @@ def process_job(job_id: str) -> None:
                 progress={"stage": stage, "pct": pct},
             )
 
-        # Download video
+        # Download video (with Cobalt fallback for bot detection)
         logger.info(f"Processing job {job_id}: {url} at {quality}p")
-        output_file = download_video(url, quality, work_dir, on_progress)
+        output_file = None
+
+        try:
+            output_file = download_video(url, quality, work_dir, on_progress)
+        except DownloadError as e:
+            if should_fallback_to_cobalt(e):
+                logger.info("yt-dlp failed with bot detection, trying Cobalt fallback")
+                update_job(
+                    redis,
+                    job_id,
+                    progress={"stage": ProgressStage.DOWNLOADING.value, "pct": 0},
+                )
+                output_file = download_with_cobalt(url, quality, work_dir, on_progress)
+            else:
+                raise
+
+        if output_file is None:
+            raise DownloadError(ErrorCode.DOWNLOAD_FAILED, "No output file produced")
 
         # Update progress - uploading
         update_job(

@@ -32,10 +32,17 @@ def sanitize_filename(title: str) -> str:
 def get_format_selector(quality: str) -> str:
     """
     Get yt-dlp format selector string for requested quality.
+
+    Uses separate video + audio streams for better compatibility,
+    especially with YouTube Shorts and restricted videos.
     """
-    # Use simple 'best' for maximum compatibility
-    # yt-dlp will automatically select the best available format
-    return "best"
+    quality_map = {
+        "480": "bv*[height<=480]+ba/best",
+        "720": "bv*[height<=720]+ba/best",
+        "1080": "bv*[height<=1080]+ba/best",
+        "best": "bv*+ba/best",
+    }
+    return quality_map.get(quality, "bv*[height<=720]+ba/best")
 
 
 def check_aria2c_available() -> bool:

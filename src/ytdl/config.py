@@ -55,6 +55,10 @@ class Settings(BaseSettings):
     # YouTube cookies (base64 encoded cookies.txt content)
     youtube_cookies_base64: str = ""
 
+    # Cobalt API (fallback when yt-dlp fails due to bot detection)
+    cobalt_api_url: str = "https://api.cobalt.tools/"
+    cobalt_api_key: str = ""  # Optional, for self-hosted instances
+
     @property
     def r2_endpoint_url(self) -> str:
         """Get R2 S3-compatible endpoint URL."""
