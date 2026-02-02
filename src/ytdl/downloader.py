@@ -112,6 +112,8 @@ def download_video(
         "format": get_format_selector(quality),
         "outtmpl": str(output_dir / "%(id)s.%(ext)s"),
         "merge_output_format": "mp4",
+        # Prefer h264/aac for iPhone compatibility (avoid vp9/opus)
+        "format_sort": ["vcodec:h264", "acodec:aac", "ext:mp4:m4a"],
         "progress_hooks": [progress_hook],
         "quiet": True,
         "no_warnings": True,
