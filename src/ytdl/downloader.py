@@ -18,14 +18,19 @@ logger = logging.getLogger(__name__)
 
 
 def sanitize_filename(title: str) -> str:
-    """Sanitize video title for use as filename."""
+    """Sanitize video title for use as filename (ASCII only for URL compatibility)."""
+    # Remove non-ASCII characters to avoid URL encoding issues
+    sanitized = title.encode("ascii", "ignore").decode("ascii")
     # Remove or replace invalid characters
-    sanitized = re.sub(r'[<>:"/\\|?*]', "", title)
+    sanitized = re.sub(r'[<>:"/\\|?*()&]', "", sanitized)
     # Replace multiple spaces/underscores with single underscore
     sanitized = re.sub(r"[\s_]+", "_", sanitized)
     # Limit length
     if len(sanitized) > 100:
         sanitized = sanitized[:100]
+    # Fallback if filename is empty after sanitization
+    if not sanitized.strip("_"):
+        sanitized = "video"
     return sanitized.strip("_")
 
 

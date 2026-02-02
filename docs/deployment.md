@@ -367,9 +367,6 @@ docker compose up -d --build
 
 
 ```
-curl -X POST https://ytdl.patricksudo.com/jobs \
-		-H "X-API-Token: r3BfMoS8DLE8Xkes" \
-		-H "Content-Type: application/json" \
-		-d '{"url": "https://www.youtube.com/watch?v=5NM6taoljdM", "quality": "480"}'
+curl -X POST "https://ytdl.patricksudo.com/jobs" -H "X-API-Token: r3BfMoS8DLE8Xkes" -H "Content-Type: application/json" -d '{"url": "https://www.youtube.com/watch?v=wmxCotXmn7M", "quality": "720", "wait": true}' | jq   
 ```
 
