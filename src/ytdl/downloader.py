@@ -42,12 +42,81 @@ def get_format_selector(quality: str) -> str:
     especially with YouTube Shorts and restricted videos.
     """
     quality_map = {
-        "480": "bv*[height<=480]+ba/best",
-        "720": "bv*[height<=720]+ba/best",
-        "1080": "bv*[height<=1080]+ba/best",
+        "480": "bv*[height<=480]+ba/best[height<=480]/best",
+        "720": "bv*[height<=720]+ba/best[height<=720]/best",
+        "1080": "bv*[height<=1080]+ba/best[height<=1080]/best",
         "best": "bv*+ba/best",
     }
-    return quality_map.get(quality, "bv*[height<=720]+ba/best")
+    return quality_map.get(quality, "bv*[height<=720]+ba/best[height<=720]/best")
+
+
+def get_progressive_format_selector(quality: str) -> str:
+    """
+    Get a progressive MP4-first format selector.
+
+    This avoids DASH/HLS manifests and prefers single-file MP4 formats
+    such as 18/22 that are faster and less likely to hit YouTube's
+    throttled adaptive-stream path on datacenter IPs.
+    """
+    quality_map = {
+        "480": "best[ext=mp4][height<=480]/18",
+        "720": "best[ext=mp4][height<=720]/22/18",
+        "1080": "best[ext=mp4][height<=1080]/22/18",
+        "best": "best[ext=mp4]/22/18",
+    }
+    return quality_map.get(quality, "best[ext=mp4][height<=720]/22/18")
+
+
+def should_retry_with_adaptive_formats(error_message: str) -> bool:
+    """Return True when the progressive MP4 fast path has no usable format."""
+    message = error_message.lower()
+    retry_patterns = (
+        "requested format is not available",
+        "requested format not available",
+        "no suitable format",
+        "no video formats found",
+        "only images are available for download",
+    )
+    return any(pattern in message for pattern in retry_patterns)
+
+
+def build_ydl_opts(
+    quality: str,
+    output_dir: Path,
+    progress_hook,
+    *,
+    progressive_only: bool,
+) -> dict:
+    """Build yt-dlp options for the selected download strategy."""
+    ydl_opts = {
+        "format": (
+            get_progressive_format_selector(quality)
+            if progressive_only
+            else get_format_selector(quality)
+        ),
+        "outtmpl": str(output_dir / "%(id)s.%(ext)s"),
+        "merge_output_format": "mp4",
+        "socket_timeout": 30,
+        "retries": 3,
+        "fragment_retries": 5,
+        "progress_hooks": [progress_hook],
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
+        # Prefer remux over re-encode
+        "postprocessor_args": {
+            "ffmpeg": ["-c", "copy"],
+        },
+    }
+
+    if progressive_only:
+        # Skip DASH/HLS manifest extraction so yt-dlp goes straight to direct MP4s.
+        ydl_opts["extractor_args"] = {"youtube": ["skip=dash,hls"]}
+    else:
+        # Prefer h264/aac for iPhone compatibility on the adaptive-stream fallback.
+        ydl_opts["format_sort"] = ["vcodec:h264", "acodec:aac", "ext:mp4:m4a"]
+
+    return ydl_opts
 
 
 def check_aria2c_available() -> bool:
@@ -57,8 +126,7 @@ def check_aria2c_available() -> bool:
 
 def get_cookies_file() -> Path | None:
     """Get cookies file path, creating from base64 env var if needed."""
-    # Cookies disabled - Railway IP works without them
-    # If needed in future, set YOUTUBE_COOKIES_BASE64 env var
+    # If configured, pass cookies through to yt-dlp.
     if not settings.youtube_cookies_base64:
         return None
 
@@ -107,58 +175,49 @@ def download_video(
         elif progress_callback and d["status"] == "finished":
             progress_callback("processing", 0)
 
-    # Configure yt-dlp options
-    ydl_opts = {
-        "format": get_format_selector(quality),
-        "outtmpl": str(output_dir / "%(id)s.%(ext)s"),
-        "merge_output_format": "mp4",
-        # Prefer h264/aac for iPhone compatibility (avoid vp9/opus)
-        "format_sort": ["vcodec:h264", "acodec:aac", "ext:mp4:m4a"],
-        "progress_hooks": [progress_hook],
-        "quiet": True,
-        "no_warnings": True,
-        # Prefer remux over re-encode
-        "postprocessor_args": {
-            "ffmpeg": ["-c", "copy"],
-        },
-    }
+    def run_download(*, progressive_only: bool) -> Path:
+        ydl_opts = build_ydl_opts(
+            quality,
+            output_dir,
+            progress_hook,
+            progressive_only=progressive_only,
+        )
 
-    # Add cookies if available
-    cookies_file = get_cookies_file()
-    if cookies_file:
-        ydl_opts["cookiefile"] = str(cookies_file)
+        # Add cookies if available
+        cookies_file = get_cookies_file()
+        if cookies_file:
+            ydl_opts["cookiefile"] = str(cookies_file)
 
-    # Use aria2c if available for faster downloads
-    if check_aria2c_available():
-        ydl_opts["external_downloader"] = "aria2c"
-        ydl_opts["external_downloader_args"] = {
-            "aria2c": [
-                f"-x{settings.concurrent_fragments}",
-                f"-s{settings.concurrent_fragments}",
-                "-k1M",
-                "--file-allocation=none",
-            ]
-        }
-        logger.info("Using aria2c for download")
-    else:
-        logger.info("aria2c not found, using built-in downloader")
+        # Use aria2c if available for faster downloads
+        if check_aria2c_available():
+            ydl_opts["external_downloader"] = "aria2c"
+            ydl_opts["external_downloader_args"] = {
+                "aria2c": [
+                    f"-x{settings.concurrent_fragments}",
+                    f"-s{settings.concurrent_fragments}",
+                    "-k1M",
+                    "--file-allocation=none",
+                ]
+            }
+            logger.info("Using aria2c for download")
+        else:
+            logger.info("aria2c not found, using built-in downloader")
 
-    try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Extract info first to get video ID
-            info = ydl.extract_info(url, download=False)
+            info = ydl.extract_info(url, download=True)
             if not info:
                 raise DownloadError(ErrorCode.UPSTREAM_FAILURE, "Could not extract video info")
 
             video_id = info.get("id", "video")
             video_title = info.get("title", "video")
 
-            # Download the video
-            logger.info(f"Downloading: {video_title} ({video_id})")
-            ydl.download([url])
+            logger.info(
+                "Downloaded %s (%s) via %s path",
+                video_title,
+                video_id,
+                "progressive" if progressive_only else "adaptive",
+            )
 
-            # Find the output file
-            output_pattern = output_dir / f"{video_id}.*"
             output_files = list(output_dir.glob(f"{video_id}.*"))
 
             if not output_files:
@@ -209,6 +268,19 @@ def download_video(
             logger.info(f"Download complete: {final_path}")
             return final_path
 
+    try:
+        return run_download(progressive_only=True)
+    except yt_dlp.utils.DownloadError as e:
+        logger.warning(f"Progressive download path failed: {e}")
+        if not should_retry_with_adaptive_formats(str(e)):
+            if "unavailable" in str(e).lower() or "private" in str(e).lower():
+                raise DownloadError(ErrorCode.UPSTREAM_FAILURE, str(e)) from e
+            raise DownloadError(ErrorCode.DOWNLOAD_FAILED, str(e)) from e
+
+        logger.info("Retrying with adaptive YouTube formats")
+
+    try:
+        return run_download(progressive_only=False)
     except yt_dlp.utils.DownloadError as e:
         logger.error(f"yt-dlp download error: {e}")
         if "unavailable" in str(e).lower() or "private" in str(e).lower():

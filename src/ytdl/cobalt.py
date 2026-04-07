@@ -255,7 +255,7 @@ def should_fallback_to_cobalt(error: Exception) -> bool:
     """
     error_str = str(error).lower()
 
-    # Bot detection / sign-in required errors
+    # Bot detection / sign-in / throttle errors
     bot_detection_patterns = [
         "sign in",
         "signin",
@@ -265,6 +265,9 @@ def should_fallback_to_cobalt(error: Exception) -> bool:
         "captcha",
         "unusual traffic",
         "blocked",
+        "throttled",
+        "timed out",
+        "timeout",
     ]
 
     for pattern in bot_detection_patterns:
