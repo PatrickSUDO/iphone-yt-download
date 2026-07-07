@@ -11,6 +11,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
+# Install deno as JS runtime for yt-dlp YouTube extraction
+# (yt-dlp deprecated JS-less extraction; without a runtime some formats are missing)
+COPY --from=denoland/deno:bin /deno /usr/local/bin/deno
+
 # Copy project files
 COPY pyproject.toml uv.lock ./
 COPY src/ ./src/
